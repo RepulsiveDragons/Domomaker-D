@@ -4,6 +4,8 @@ const { Account } = models;
 
 const loginPage = (req, res) => res.render('login');
 
+const changePasswordPage = (req, res) => res.render('changePassword');
+
 const logout = (req, res) => {
   req.session.destroy();
   return res.redirect('/');
@@ -56,9 +58,77 @@ const signup = async (req, res) => {
   }
 };
 
+const changePassword = (req, res) => {
+  const currentPassword = `${req.body.pass}`;
+  const newPass = `${req.body.newPass}`;
+  const newPass2 = `${req.body.newPass2}`;
+  const { username } = req.session.account;
+
+  if (!currentPassword || !newPass || !newPass2) {
+    return res.status(400).json({ error: 'All fields are required!' });
+  }
+
+  if (newPass !== newPass2) {
+    return res.status(400).json({ error: 'Passwords do not match!' });
+  }
+
+  let doc;
+
+  return Account.authenticate(username, currentPassword, async (err, account) => {
+    if (err || !account) {
+      return res.status(401).json({ error: 'This is not your current password!' });
+    }
+
+    try {
+      doc = await Account.findOne({ username }).exec();
+      if (!doc) {
+        return res.status(500).json({ error: 'User was not found!' });
+      }
+    } catch (error) {
+      return res.status(500).json({ error: 'An error occured!' });
+    }
+
+    try {
+      const hash = await Account.generateHash(newPass);
+      doc.password = hash;
+      await doc.save();
+
+      req.session.destroy();
+      return res.json({ redirect: '/' });
+    } catch (error) {
+      return res.status(500).json({ error: 'Error updating password!' });
+    }
+  });
+  // if (err || !account) {
+  //   return res.status(401).json({ error: 'This is not your current password!' });
+  // }
+
+  // try {
+  //   doc = await Account.findOne({ username }).exec();
+  //   if (!doc) {
+  //     return res.status(500).json({ error: 'User was not found!' });
+  //   }
+  // } catch (error) {
+  //   return res.status(500).json({ error: 'An error occured!' });
+  // }
+
+  // try {
+  //   const hash = await Account.generateHash(newPass);
+  //   doc.password = hash;
+  //   await doc.save();
+
+  //   req.session.destroy();
+  //   return res.json({ redirect: '/' });
+  // } catch (error) {
+  //   return res.status(500).json({ error: 'Error updating password!' });
+  // }
+};
+
 module.exports = {
   loginPage,
+  changePasswordPage,
   login,
   logout,
   signup,
+  changePassword,
 };
